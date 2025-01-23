@@ -72,72 +72,140 @@ def track_click(
     campaign_id: int,
     db: Session = Depends(database.get_db),
 ):
+    try:
+        # Verify campaign exists
+        campaign = (
+            db.query(models.Campaign).filter(models.Campaign.id == campaign_id).first()
+        )
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
 
-    # Verify campaign exists
-    campaign = (
-        db.query(models.Campaign).filter(models.Campaign.id == campaign_id).first()
-    )
-    if not campaign:
-        raise HTTPException(status_code=404, detail="Campaign not found")
+        # Get employee from email - Fix: getting full employee object
+        employee = (
+            db.query(models.Employee).filter(models.Employee.email == email).first()
+        )
+        if not employee:
+            raise HTTPException(status_code=404, detail="Employee not found")
 
-    # Get employee_id from email
-    employee = (
-        db.query(models.Employee).filter(models.Employee.email == email).first().id
-    )
-    if not employee:
-        raise HTTPException(status_code=404, detail="Employee not found")
+        event = models.Event(
+            email=email,
+            campaign_id=campaign_id,
+            employee_id=employee.id,
+            event_type=models.EventType.CLICK,
+            ip=request.client.host,
+        )
+        db.add(event)
+        db.commit()
+        db.refresh(event)
 
-    event = models.Event(
-        email=email,
-        campaign_id=campaign_id,
-        employee_id=employee.id,  # add employee
-        event_type=models.EventType.CLICK,
-        ip=request.client.host,
-    )
-    db.add(event)
-    db.commit()
-    db.refresh(event)
-    # return fake submission html form to log a submitted event
-    return templates.TemplateResponse(
-        "submission.html",
-        {
-            "request": request,
-            "campaign_id": campaign_id,
-            "employee_email": email,
-            "employee_id": employee.id,
-        },
-    )
+        # Return template response
+        return templates.TemplateResponse(
+            "submission.html",
+            {
+                "request": request,
+                "campaign_id": campaign_id,
+                "employee_email": email,
+                "employee_id": employee.id,
+            },
+        )
+    except Exception as e:
+        db.rollback()
+        print(f"Track click error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/track_click", response_class=HTMLResponse)
+def track_click(
+    request: Request,
+    email: str,
+    campaign_id: int,
+    db: Session = Depends(database.get_db),
+):
+    try:
+        # Verify campaign exists
+        campaign = (
+            db.query(models.Campaign).filter(models.Campaign.id == campaign_id).first()
+        )
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+
+        # Get employee from email - Fix: getting full employee object
+        employee = (
+            db.query(models.Employee).filter(models.Employee.email == email).first()
+        )
+        if not employee:
+            raise HTTPException(status_code=404, detail="Employee not found")
+
+        event = models.Event(
+            email=email,
+            campaign_id=campaign_id,
+            employee_id=employee.id,
+            event_type=models.EventType.CLICK,
+            ip=request.client.host,
+        )
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+
+        # Return template response
+        return templates.TemplateResponse(
+            "submission.html",
+            {
+                "request": request,
+                "campaign_id": campaign_id,
+                "employee_email": email,
+                "employee_id": employee.id,
+            },
+        )
+    except Exception as e:
+        db.rollback()
+        print(f"Track click error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/track_submitted")
 async def track_submitted(request: Request, db: Session = Depends(database.get_db)):
-    form = await request.form()
-    email = form.get("employee_email")
-    campaign_id = form.get("campaign_id")
-    employee_id = form.get("employee_id")
-    print(email)
+    try:
+        form = await request.form()
+        email = form.get("employee_email")
+        campaign_id = form.get("campaign_id")
+        employee_id = form.get("employee_id")
 
-    # Get employee_id from email
+        # Validate required fields
+        if not all([email, campaign_id, employee_id]):
+            raise HTTPException(status_code=400, detail="Missing required fields")
 
-    if not employee_id:
-        raise HTTPException(status_code=404, detail="Employee not found")
+        # Convert campaign_id and employee_id to integers
+        try:
+            campaign_id = int(campaign_id)
+            employee_id = int(employee_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid ID format")
 
-    # Create SUBMITTED event
-    event = models.Event(
-        email=email,
-        campaign_id=campaign_id,
-        employee_id=employee_id,
-        event_type=models.EventType.SUBMITTED,
-        ip=request.client.host,
-    )
-    db.add(event)
-    db.commit()
-    db.refresh(event)
+        # Create SUBMITTED event
+        event = models.Event(
+            email=email,
+            campaign_id=campaign_id,
+            employee_id=employee_id,
+            event_type=models.EventType.SUBMITTED,
+            ip=request.client.host,
+        )
+        db.add(event)
+        db.commit()
+        db.refresh(event)
 
-    return templates.TemplateResponse(
-        "training.html",
-        {"request": request, "campaign_id": campaign_id, "email": email},
-    )
+        return templates.TemplateResponse(
+            "training.html",
+            {"request": request, "campaign_id": campaign_id, "email": email},
+        )
+
+    except HTTPException as he:
+        db.rollback()
+        raise he
+    except Exception as e:
+        db.rollback()
+        print(f"Track submitted error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/track_reported")

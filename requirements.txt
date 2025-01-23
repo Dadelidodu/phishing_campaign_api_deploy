@@ -5,3 +5,5 @@ jinja2==3.1.5
 uvicorn==0.34.0
 pandas==2.2.3
 pydantic[email]
+psycopg2
+asyncpg

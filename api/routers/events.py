@@ -34,45 +34,12 @@ def track_open(
     campaign_id: int,
     db: Session = Depends(database.get_db),
 ):
-    # --- 1x1 Transparent GIF (Base64 Encoded) ---
-    ONE_PIXEL_GIF_BASE64 = (
-        "R0lGODlhAQABAPAAAAAAAAAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=="
-    )
-    ONE_PIXEL_GIF = base64.b64decode(ONE_PIXEL_GIF_BASE64)
-
-    # Verify campaign exists
-    campaign = (
-        db.query(models.Campaign).filter(models.Campaign.id == campaign_id).first()
-    )
-    if not campaign:
-        raise HTTPException(status_code=404, detail="Campaign not found")
-
-    # Get employee_id from email
-    employee = db.query(models.Employee).filter(models.Employee.email == email).first()
-    if not employee:
-        raise HTTPException(status_code=404, detail="Employee not found")
-
-    event = models.Event(
-        email=email,
-        campaign_id=campaign_id,
-        employee_id=employee.id,
-        event_type=models.EventType.OPEN,
-        ip=request.client.host,
-    )
-    db.add(event)
-    db.commit()
-    db.refresh(event)
-    return Response(content=ONE_PIXEL_GIF, media_type="image/gif")
-
-
-@router.get("/track_click", response_class=HTMLResponse)
-def track_click(
-    request: Request,
-    email: str,
-    campaign_id: int,
-    db: Session = Depends(database.get_db),
-):
     try:
+        ONE_PIXEL_GIF_BASE64 = (
+            "R0lGODlhAQABAPAAAAAAAAAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=="
+        )
+        ONE_PIXEL_GIF = base64.b64decode(ONE_PIXEL_GIF_BASE64)
+
         # Verify campaign exists
         campaign = (
             db.query(models.Campaign).filter(models.Campaign.id == campaign_id).first()
@@ -80,37 +47,33 @@ def track_click(
         if not campaign:
             raise HTTPException(status_code=404, detail="Campaign not found")
 
-        # Get employee from email - Fix: getting full employee object
+        # Get employee from email
         employee = (
             db.query(models.Employee).filter(models.Employee.email == email).first()
         )
         if not employee:
             raise HTTPException(status_code=404, detail="Employee not found")
 
+        # Create OPEN event
         event = models.Event(
             email=email,
             campaign_id=campaign_id,
             employee_id=employee.id,
-            event_type=models.EventType.CLICK,
+            event_type=models.EventType.OPEN,
             ip=request.client.host,
         )
         db.add(event)
         db.commit()
         db.refresh(event)
 
-        # Return template response
-        return templates.TemplateResponse(
-            "submission.html",
-            {
-                "request": request,
-                "campaign_id": campaign_id,
-                "employee_email": email,
-                "employee_id": employee.id,
-            },
-        )
+        return Response(content=ONE_PIXEL_GIF, media_type="image/gif")
+
+    except HTTPException as he:
+        db.rollback()
+        raise he
     except Exception as e:
         db.rollback()
-        print(f"Track click error: {str(e)}")
+        print(f"Track open error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -235,7 +198,10 @@ def track_reported(
         db.commit()
         db.refresh(event)
 
-        return {"status": "success"}
+        return templates.TemplateResponse(
+            "reported.html",
+            {"request": request},
+        )
 
     except Exception as e:
         print(f"Track reported error: {str(e)}")

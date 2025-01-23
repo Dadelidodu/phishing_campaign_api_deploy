@@ -6,10 +6,13 @@ from .. import models, database
 from pydantic import BaseModel
 from datetime import datetime
 from fastapi.templating import Jinja2Templates
+import base64
+
 
 
 router = APIRouter(prefix="/events", tags=["events"])
 templates = Jinja2Templates(directory="api/templates")
+
 
 
 class EventResponse(BaseModel):
@@ -26,13 +29,17 @@ class EventResponse(BaseModel):
         from_attributes = True
 
 
-@router.get("/track_open")
+@router.post("/track_open")
 def track_open(
     request: Request,
     email: str,
     campaign_id: int,
-    db: Session = Depends(database.get_db),
+    db: Session = Depends(database.get_db)
 ):
+    # --- 1x1 Transparent GIF (Base64 Encoded) ---
+    ONE_PIXEL_GIF_BASE64 = "R0lGODlhAQABAPAAAAAAAAAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=="
+    ONE_PIXEL_GIF = base64.b64decode(ONE_PIXEL_GIF_BASE64)
+
     # Verify campaign exists
     campaign = (
         db.query(models.Campaign).filter(models.Campaign.id == campaign_id).first()
@@ -55,16 +62,18 @@ def track_open(
     db.add(event)
     db.commit()
     db.refresh(event)
-    return {"status": "success"}
+    return Response(content=ONE_PIXEL_GIF, media_type="image/gif")
 
 
-@router.get("/track_click", response_class=HTMLResponse)
+
+@router.post("/track_click", response_class=HTMLResponse)
 def track_click(
     request: Request,
     email: str,
     campaign_id: int,
     db: Session = Depends(database.get_db),
 ):
+
     # Verify campaign exists
     campaign = (
         db.query(models.Campaign).filter(models.Campaign.id == campaign_id).first()
@@ -126,7 +135,7 @@ async def track_submitted(request: Request, db: Session = Depends(database.get_d
     )
 
 
-@router.get("/track_reported")
+@router.post("/track_reported")
 def track_reported(
     request: Request,
     email: str,
@@ -160,7 +169,7 @@ def track_reported(
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/track_downloaded")
+@router.post("/track_downloaded")
 def track_reported(
     request: Request,
     email: str,

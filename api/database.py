@@ -1,12 +1,14 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./phishing_campaigns.db"
+# Get the database URL from environment variables
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://phishing_campaign_user:XXqQCPlBaKMNwACCh286WfW94Eyo9XKS@dpg-cu8vt3hopnds73amu50g-a/phishing_campaign")
 
-# Create SQLite engine
+# Create engine
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in SQLALCHEMY_DATABASE_URL else {}
 )
 
 # Create SessionLocal class
@@ -14,7 +16,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Create Base class
 Base = declarative_base()
-
 
 # Dependency to get DB session
 def get_db():

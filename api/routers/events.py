@@ -29,7 +29,7 @@ class EventResponse(BaseModel):
         from_attributes = True
 
 
-@router.post("/track_open")
+@router.get("/track_open")
 def track_open(
     request: Request,
     email: str,
@@ -66,7 +66,7 @@ def track_open(
 
 
 
-@router.post("/track_click", response_class=HTMLResponse)
+@router.get("/track_click", response_class=HTMLResponse)
 def track_click(
     request: Request,
     email: str,
@@ -135,7 +135,7 @@ async def track_submitted(request: Request, db: Session = Depends(database.get_d
     )
 
 
-@router.post("/track_reported")
+@router.get("/track_reported")
 def track_reported(
     request: Request,
     email: str,
@@ -169,7 +169,7 @@ def track_reported(
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/track_downloaded")
+@router.get("/track_downloaded")
 def track_reported(
     request: Request,
     email: str,

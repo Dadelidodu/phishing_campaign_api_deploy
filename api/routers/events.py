@@ -9,10 +9,8 @@ from fastapi.templating import Jinja2Templates
 import base64
 
 
-
 router = APIRouter(prefix="/events", tags=["events"])
 templates = Jinja2Templates(directory="api/templates")
-
 
 
 class EventResponse(BaseModel):
@@ -34,10 +32,12 @@ def track_open(
     request: Request,
     email: str,
     campaign_id: int,
-    db: Session = Depends(database.get_db)
+    db: Session = Depends(database.get_db),
 ):
     # --- 1x1 Transparent GIF (Base64 Encoded) ---
-    ONE_PIXEL_GIF_BASE64 = "R0lGODlhAQABAPAAAAAAAAAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=="
+    ONE_PIXEL_GIF_BASE64 = (
+        "R0lGODlhAQABAPAAAAAAAAAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=="
+    )
     ONE_PIXEL_GIF = base64.b64decode(ONE_PIXEL_GIF_BASE64)
 
     # Verify campaign exists
@@ -65,7 +65,6 @@ def track_open(
     return Response(content=ONE_PIXEL_GIF, media_type="image/gif")
 
 
-
 @router.get("/track_click", response_class=HTMLResponse)
 def track_click(
     request: Request,
@@ -82,7 +81,9 @@ def track_click(
         raise HTTPException(status_code=404, detail="Campaign not found")
 
     # Get employee_id from email
-    employee = db.query(models.Employee).filter(models.Employee.email == email).first()
+    employee = (
+        db.query(models.Employee).filter(models.Employee.email == email).first().id
+    )
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
 
@@ -99,7 +100,12 @@ def track_click(
     # return fake submission html form to log a submitted event
     return templates.TemplateResponse(
         "submission.html",
-        {"request": request, "campaign_id": campaign_id, "employee_email": email},
+        {
+            "request": request,
+            "campaign_id": campaign_id,
+            "employee_email": email,
+            "employee_id": employee.id,
+        },
     )
 
 
@@ -108,19 +114,19 @@ async def track_submitted(request: Request, db: Session = Depends(database.get_d
     form = await request.form()
     email = form.get("employee_email")
     campaign_id = form.get("campaign_id")
-    # employee_id = form.get("employee_id")
+    employee_id = form.get("employee_id")
     print(email)
 
     # Get employee_id from email
-    employee = db.query(models.Employee).filter(models.Employee.email == email).first()
-    if not employee:
+
+    if not employee_id:
         raise HTTPException(status_code=404, detail="Employee not found")
 
     # Create SUBMITTED event
     event = models.Event(
         email=email,
         campaign_id=campaign_id,
-        employee_id=employee.id,
+        employee_id=employee_id,
         event_type=models.EventType.SUBMITTED,
         ip=request.client.host,
     )
@@ -130,8 +136,7 @@ async def track_submitted(request: Request, db: Session = Depends(database.get_d
 
     return templates.TemplateResponse(
         "training.html",
-        {"request": request, "campaign_id": campaign_id,
-         "email": email}
+        {"request": request, "campaign_id": campaign_id, "email": email},
     )
 
 
@@ -168,6 +173,7 @@ def track_reported(
         print(f"Track reported error: {str(e)}")
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/track_downloaded")
 def track_reported(

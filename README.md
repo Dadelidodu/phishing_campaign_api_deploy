@@ -5,7 +5,7 @@
 
 ## Introduction
 
-Phish & Clicks is a web-based application built with FastAPI and Streamlit that you can read more about [here](https://github.com/pschchowah/phishing_campaign)
+Phish & Clicks is a web-based application built with FastAPI and Streamlit that you can read more about [here](https://github.com/pschchowah/phishing_campaign).
 It enables security teams to:
 - Launch targeted phishing simulation campaigns
 - Track employee interactions with phishing emails
